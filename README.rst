@@ -3,8 +3,7 @@ MIOPY: Python tool to study miRNA-mRNA relationships.
 
 
 
-MIOPY is a Python3 tool that allows studying the miRNA/mRNA interaction in several different ways. MIOPY includes the state-of-the-art method to predict miRNA target through expression data. MIOPY includes 40 pre-process prediction tools 
-to improve the results. Finally, MIOPY allows to use the of state-of-the-art machine learning methods to apply a feature selection in order to identify prognostic biomarker signatures.
+MIOPY is a Python3 tool that allows studying the miRNA/mRNA interaction in several different ways. MIOPY applies state-of-the-art methods to predict miRNA targets through expression data. MIOPY includes 40 pre-process prediction tools to improve the results. Finally, MIOPY uses state-of-the-art machine learning methods to apply a feature selection in order to identify prognostic biomarker signatures.
  
 The four main types of analyses available in MIOPY are:
 
@@ -13,7 +12,9 @@ The four main types of analyses available in MIOPY are:
 * Identification of prognostic biomarkers and survival analyses
 * Identification of predictive biomarkers and classification
 
-MIOPY was developed to handle the analysis in `MIO <http://mio.icbi.at>`_. Please check the MIO `repository <http://github.com/icbi-lab/mio>`_ to run MIO locally. MIOPY includes all the functions available in MIO.
+MIOPY was developed to handle the analyses in the `MIO-Webtool <http://mio.icbi.at>`_. 
+Please check the MIO `repository <http://github.com/icbi-lab/mio>`_ to run MIO locally. 
+MIOPY includes all the functions available in MIO.
 
 **We are happy about feedback and welcome contributions!**
 
