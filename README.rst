@@ -13,7 +13,7 @@ The four main types of analyses available in MIOPY are:
 * Identification of prognostic biomarkers and survival analyses
 * Identification of predictive biomarkers and classification
 
-MIOPY was developed to handle the analysis in `MIO <http://mio.icbi.at>`_. Please check the MIO `repository <http://github.com/icbi-lab/mio>`_to run MIO locally. MIOPY includes all the functions available in MIO.
+MIOPY was developed to handle the analysis in `MIO <http://mio.icbi.at>`_. Please check the MIO `repository <http://github.com/icbi-lab/mio>`_ to run MIO locally. MIOPY includes all the functions available in MIO.
 
 **We are happy about feedback and welcome contributions!**
 
