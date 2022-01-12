@@ -21,7 +21,7 @@ Getting started
 ^^^^^^^^^^^^^^^
 Please check the jupyter-notebook with that same Use cases example present in the *P. Monfort-Lanzas et al.* publication.
 
--  `Use cases <./test/test.ipynb`_
+-  `Use cases <./test/test.ipynb>`_
 
 Installation
 ^^^^^^^^^^^^
