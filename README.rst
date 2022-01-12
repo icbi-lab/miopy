@@ -13,8 +13,7 @@ The four main types of analyses available in MIOPY are:
 * Identification of prognostic biomarkers and survival analyses
 * Identification of predictive biomarkers and classification
 
-MIOPY was developed to handle the analysis in `MIO <http://mio.icbi.at>`_. Please check the MIO `repository <http://github.com/icbi-lab/mio>`_
- to run MIO locally. MIOPY includes all the functions to run the analyses that MIO from python.
+MIOPY was developed to handle the analysis in `MIO <http://mio.icbi.at>`_. Please check the MIO `repository <http://github.com/icbi-lab/mio>`_to run MIO locally. MIOPY includes all the functions available in MIO.
 
 **We are happy about feedback and welcome contributions!**
 
@@ -22,7 +21,7 @@ Getting started
 ^^^^^^^^^^^^^^^
 Please check the jupyter-notebook with that same Use cases example present in the *P. Monfort-Lanzas et al.* publication.
 
--  Use cases
+-  `Use cases <./test/test.ipynb`_
 
 Installation
 ^^^^^^^^^^^^
@@ -34,8 +33,12 @@ There are several alternative options to install MIOPY:
 
 .. code-block::
 
-    python3 setup.py install
+  git clone git@github.com:icbi-lab/miopy.git && cd miopy && python3 setup.py install
 
+.. 2) Install the latest development version:
+
+.. code-block::
+ python3 -m pip install git+https://github.com/icbi-lab/miopy.git
 
 
 Release notes
