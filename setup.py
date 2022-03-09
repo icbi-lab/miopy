@@ -19,13 +19,9 @@ setup(
        "numpy",
        "ranky",
        "pandarallel",
-       "statsmodels",
-       "scikit-learn==0.24.0",
        "lifelines",
        "argparse",
        "eli5",
-       "Cython",
-       "scikit-survival",
 
    ],
    include_package_data=True,

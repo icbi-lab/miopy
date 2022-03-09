@@ -11,7 +11,6 @@ import plotly.offline as opy
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import ShuffleSplit, GridSearchCV
 import warnings
-from .R_utils import get_survival_cutoff
 
 #######################
 ### Sklearn Survival ##
@@ -297,14 +296,16 @@ def survival_selection(data, k = 10, topk = 100, event = "event",  n_core = 2):
 ### Survival Analysis ##
 ########################
 
-def get_exprs_cutoff(exprDF, target="hsa-miR-223-3p", q = 0.5, optimal = True):
+def get_exprs_cutoff(exprDF, target="hsa-miR-223-3p", q = 0.5, treshold = None, optimal = True):
     from scipy import stats
 
     if optimal:
-        treshold = cutoff(exprDF, target=target)
-        q = stats.percentileofscore(exprDF[target],treshold)/100
+        q, treshold  = get_survival_cutoff(exprDF = exprDF, time = "time", event = "event", target = target)
     else:
-        treshold = exprDF[target].quantile(q)
+        if treshold != None:
+            q = stats.percentileofscore(exprDF[target],treshold)/100
+        else:
+            treshold = exprDF[target].quantile(q)
 
     return q, treshold
 
@@ -317,11 +318,21 @@ def split_by_exprs(exprDF, target="hsa-miR-223-3p", treshold = 0.5):
     #print("Splitted")
     return exprDF
 
-def cutoff(exprDF, time = "time", event = "event", target = "target"):
+def get_survival_cutoff(exprDF = "exprDF", time = "time", event = "event", target = "target"):
+    lPoint = exprDF[target].unique().tolist()
     
-    cutpoint = get_survival_cutoff(fPath = exprDF, time = time, event = event, target = target)
-
-    return cutpoint
+    df = pd.DataFrame()
+    for point in lPoint:
+        q, treshold = get_exprs_cutoff(exprDF, target=target, treshold = point, optimal = False)
+        try:
+            tRes = get_hazard_ratio(split_by_exprs(exprDF, target=target, treshold = treshold))
+        except Exception as error:
+            print(error)
+            tRes = (0, 1,)
+        dfTemp = pd.Series({"Target":target,"Q":q,"Cutpoint":treshold,"HR":tRes[0],"pval":tRes[1]})
+        df = pd.concat([df,dfTemp], axis = 1)
+    row = df.transpose().sort_values("pval").iloc[0,:]
+    return row["Q"], row["Cutpoint"]
 
 def get_hazard_ratio(exprDF, target = "exprs"):
     np.seterr(divide='ignore', invalid='ignore')

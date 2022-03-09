@@ -17,3 +17,9 @@ All notable changes to this project will be documented in this file.
 - [MIOPY-1001]
   Create geneset adjust pval
   Move some functions to process_data
+
+## [1.0.2] - 2022-02-09
+### Added
+- [MIOPY-1002]
+  Create get_survival_cutoff to obtain the optimal cutpoint in Python
+

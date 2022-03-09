@@ -15,9 +15,9 @@ def sort_abs(df):
     df = df.reindex(df.abs().sort_values(ascending=False).index)
     return df
 
-def rf(X_train, y_train, X_test, y_test, lFeature = None):
+def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = RandomForestClassifier(n_estimators=300)
+    md = RandomForestClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -33,9 +33,9 @@ def rf(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, feature
 
 
-def gbc(X_train, y_train, X_test, y_test, lFeature = None):
+def gbc(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = GradientBoostingClassifier(n_estimators=300)
+    md = GradientBoostingClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -51,9 +51,9 @@ def gbc(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, feature
 
 
-def ada(X_train, y_train, X_test, y_test, lFeature = None):
+def ada(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = AdaBoostClassifier(n_estimators=300)
+    md = AdaBoostClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -68,9 +68,9 @@ def ada(X_train, y_train, X_test, y_test, lFeature = None):
     
     return scoreTraining, scoreTest, feature
 
-def lr(X_train, y_train, X_test, y_test, lFeature = None):
+def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = LogisticRegression(penalty="l2", max_iter=10000)
+    md = LogisticRegression(penalty="l2", max_iter=10000, random_state = seed)
     # let's normalize, anyway
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -85,28 +85,9 @@ def lr(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, feature
 
 
-def ridge(X_train, y_train, X_test, y_test, lFeature = None):
+def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = RidgeClassifier(max_iter=10000)
-
-    # let's normalize, anyway
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    md.fit(X_train, y_train)
-    scoreTraining = md.score(X_train, y_train)
-    scoreTest = md.score(X_test, y_test)
-    feature = pd.Series(md.coef_[0], index = lFeature)
-    feature = sort_abs(feature)
-
-    return scoreTraining, scoreTest, feature
-
-
-
-def svm(X_train, y_train, X_test, y_test, lFeature = None):
-    
-    md = SVC(kernel='linear')
+    md = RidgeClassifier(max_iter=10000, random_state = seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -122,9 +103,28 @@ def svm(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, feature
 
 
-def bagging(X_train, y_train, X_test, y_test, lFeature = None):
+
+def svm(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = BaggingClassifier(n_estimators=300)
+    md = SVC(kernel='linear', random_state = seed)
+
+    # let's normalize, anyway
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    md.fit(X_train, y_train)
+    scoreTraining = md.score(X_train, y_train)
+    scoreTest = md.score(X_test, y_test)
+    feature = pd.Series(md.coef_[0], index = lFeature)
+    feature = sort_abs(feature)
+
+    return scoreTraining, scoreTest, feature
+
+
+def bagging(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
+    
+    md = BaggingClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -143,7 +143,7 @@ def bagging(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, feature
 
 
-def feature_selection(data, k = 10, topk = 100, group = "Group"):
+def feature_selection(data, k = 10, topk = 100, group = "Group", seed = 123):
     # list of classifiers, selected on the basis of our previous paper "
     
     modelList = [[rf,"Random Forest",],
@@ -160,7 +160,7 @@ def feature_selection(data, k = 10, topk = 100, group = "Group"):
     
     X, Y = data.drop(group, axis =1), label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
     
-    skf = StratifiedKFold(n_splits=k, shuffle=True)
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
     
     lFeature = data.drop(group, axis =1).columns.tolist()
@@ -180,7 +180,7 @@ def feature_selection(data, k = 10, topk = 100, group = "Group"):
 
             classifier = copy.deepcopy(model)
             scoreTraining, scoreTest, orderedFeatures = classifier(X_train, y_train,\
-                                                X_test, y_test, lFeature = lFeature)
+                                                X_test, y_test, lFeature = lFeature, seed = seed)
 
 
             print("\ttraining: %.4f, test: %.4f" % (scoreTraining, scoreTest))

@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import copy
 
-def rf(X_train, y_train, X_test, y_test, lFeature = None):
+def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = RandomForestClassifier(n_estimators=1000)
+    md = RandomForestClassifier(n_estimators=1000, random_state=seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -30,9 +30,9 @@ def rf(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, y_predict, feature, md
 
 
-def lr(X_train, y_train, X_test, y_test, lFeature = None):
+def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = LogisticRegression(penalty="l2", max_iter=100000)
+    md = LogisticRegression(penalty="l2", max_iter=100000, random_state=seed)
     # let's normalize, anyway
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -49,9 +49,9 @@ def lr(X_train, y_train, X_test, y_test, lFeature = None):
     return scoreTraining, scoreTest, y_predict, feature, md
 
 
-def ridge(X_train, y_train, X_test, y_test, lFeature = None):
+def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = RidgeClassifier(max_iter=10000)
+    md = RidgeClassifier(max_iter=10000,random_state=seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -68,9 +68,9 @@ def ridge(X_train, y_train, X_test, y_test, lFeature = None):
 
 
 
-def svm(X_train, y_train, X_test, y_test, lFeature = None):
+def svm(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
-    md = SVC(kernel='linear')
+    md = SVC(kernel='linear',random_state=seed)
 
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -93,7 +93,7 @@ def svm(X_train, y_train, X_test, y_test, lFeature = None):
 
 
 
-def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFeature = None):
+def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFeature = None, seed = 123):
     # list of classifiers, selected on the basis of our previous paper "
     from sklearn.metrics import roc_auc_score, roc_curve
 
@@ -104,9 +104,9 @@ def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFe
     print("Loading dataset...")
     
     lFeature = list(set(lFeature).intersection(data.columns.tolist()))
-    X, Y = data[lFeature], label_binarize(data[group], data[group].unique().tolist())[:,0]
+    X, Y = data[lFeature], label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
 
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=101)
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
         
     model = modelList[name]
@@ -128,7 +128,7 @@ def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFe
 
         classifier = copy.deepcopy(model)
         scoreTraining, scoreTest, y_predict, feature, model_fit = classifier(X_train, y_train,\
-                                                X_test, y_test, lFeature = lFeature)
+                                                X_test, y_test, lFeature = lFeature, seed = seed)
 
         print("\ttraining: %.4f, test: %.4f" % (scoreTraining, scoreTest))
 
@@ -161,7 +161,7 @@ def classification_training_model(data, model = None, group = "event", lFeature 
     lFeature = list(set(lFeature).intersection(data.columns.tolist()))
     print(data.head())
     print(lFeature)
-    X, Y = data[lFeature], label_binarize(data[group], data[group].unique().tolist())[:,0]
+    X, Y = data[lFeature], label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
     name = type(model).__name__
     results = { 'model': name,
     'auc': [],
