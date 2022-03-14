@@ -324,13 +324,14 @@ def get_survival_cutoff(exprDF = "exprDF", time = "time", event = "event", targe
     df = pd.DataFrame()
     for point in lPoint:
         q, treshold = get_exprs_cutoff(exprDF, target=target, treshold = point, optimal = False)
-        try:
-            tRes = get_hazard_ratio(split_by_exprs(exprDF, target=target, treshold = treshold))
-        except Exception as error:
-            print(error)
-            tRes = (0, 1,)
-        dfTemp = pd.Series({"Target":target,"Q":q,"Cutpoint":treshold,"HR":tRes[0],"pval":tRes[1]})
-        df = pd.concat([df,dfTemp], axis = 1)
+        if 0.1 < q < 0.9:
+            try:
+                tRes = get_hazard_ratio(split_by_exprs(exprDF, target=target, treshold = treshold))
+            except Exception as error:
+                print(error)
+                tRes = (0, 1,)
+            dfTemp = pd.Series({"Target":target,"Q":q,"Cutpoint":treshold,"HR":tRes[0],"pval":tRes[1]})
+            df = pd.concat([df,dfTemp], axis = 1)
     row = df.transpose().sort_values("pval").iloc[0,:]
     return row["Q"], row["Cutpoint"]
 
