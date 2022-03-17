@@ -16,7 +16,7 @@ def sort_abs(df):
     return df
 
 def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = RandomForestClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
@@ -34,7 +34,7 @@ def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def gbc(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = GradientBoostingClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
@@ -52,7 +52,7 @@ def gbc(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def ada(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = AdaBoostClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
@@ -69,7 +69,7 @@ def ada(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     return scoreTraining, scoreTest, feature
 
 def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = LogisticRegression(penalty="l2", max_iter=10000, random_state = seed)
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -86,7 +86,7 @@ def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = RidgeClassifier(max_iter=10000, random_state = seed)
 
     # let's normalize, anyway
@@ -105,7 +105,7 @@ def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def svm(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = SVC(kernel='linear', random_state = seed)
 
     # let's normalize, anyway
@@ -123,7 +123,7 @@ def svm(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def bagging(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = BaggingClassifier(n_estimators=300, random_state = seed)
 
     # let's normalize, anyway
@@ -160,7 +160,7 @@ def feature_selection(data, k = 10, topk = 100, group = "Group", seed = 123):
     
     X, Y = data.drop(group, axis =1), label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
     
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=np.random.RandomState(seed))
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
     
     lFeature = data.drop(group, axis =1).columns.tolist()

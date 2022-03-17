@@ -12,7 +12,8 @@ import pandas as pd
 import copy
 
 def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+
+    seed = np.random.RandomState(seed)
     md = RandomForestClassifier(n_estimators=1000, random_state=seed)
 
     # let's normalize, anyway
@@ -32,6 +33,7 @@ def rf(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
     
+    seed = np.random.RandomState(seed)
     md = LogisticRegression(penalty="l2", max_iter=100000, random_state=seed)
     # let's normalize, anyway
     scaler = StandardScaler()
@@ -50,7 +52,7 @@ def lr(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = RidgeClassifier(max_iter=10000,random_state=seed)
 
     # let's normalize, anyway
@@ -69,7 +71,7 @@ def ridge(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
 
 
 def svm(X_train, y_train, X_test, y_test, lFeature = None, seed = 123):
-    
+    seed = np.random.RandomState(seed)
     md = SVC(kernel='linear',random_state=seed)
 
     # let's normalize, anyway
@@ -106,7 +108,7 @@ def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFe
     lFeature = list(set(lFeature).intersection(data.columns.tolist()))
     X, Y = data[lFeature], label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
 
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed = np.random.RandomState(seed))
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
         
     model = modelList[name]

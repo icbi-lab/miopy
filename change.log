@@ -18,8 +18,19 @@ All notable changes to this project will be documented in this file.
   Create geneset adjust pval
   Move some functions to process_data
 
-## [1.0.2] - 2022-02-09
+## [1.0.2] - 2022-03-09
 ### Added
 - [MIOPY-1002]
   Create get_survival_cutoff to obtain the optimal cutpoint in Python
 
+## [1.0.3] - 2022-03-15
+### Added
+- [MIOPY-1003]
+  random_seed in feature selection
+  now hazard_ratio_mirgen obtain the HR for microRNA and Gene
+
+
+## [1.0.4] - 2022-03-17
+### Added
+- [MIOPY-1004]
+  Add Altman p-value correction to get_survival_cutoff

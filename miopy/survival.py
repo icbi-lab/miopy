@@ -45,7 +45,7 @@ class EarlyStoppingMonitor:
         return diff >= self.max_iter_without_improvement
 
 
-def IPC_RIDGE(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
+def IPC_RIDGE(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, seed = 123):
     from sksurv.linear_model import IPCRidge
     from sklearn.pipeline import make_pipeline
 
@@ -53,7 +53,8 @@ def IPC_RIDGE(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
-    
+    seed = np.random.RandomState(seed)
+
     y_train_log = y_train.copy()
     y_train_log["time"] = np.log1p(y_train["time"])
     y_test_log = y_test.copy()
@@ -86,7 +87,7 @@ def score_survival_model(model, X, y):
     result = concordance_index_censored(y['event'], y['time'], prediction)
     return result[0]
 
-def SurvivalSVM(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
+def SurvivalSVM(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, seed = 123):
     from sksurv.svm import FastSurvivalSVM
     import numpy as np
 
@@ -94,12 +95,12 @@ def SurvivalSVM(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
-    
-    ssvm = FastSurvivalSVM(max_iter=100, tol=1e-5, random_state=0)
+    seed = np.random.RandomState(seed)
+    ssvm = FastSurvivalSVM(max_iter=100, tol=1e-5, random_state=seed)
 
 
     param_grid = {'alpha': 2. ** np.arange(-12, 13, 4)}
-    cv = ShuffleSplit(n_splits=10, test_size=0.2, random_state=0)
+    cv = ShuffleSplit(n_splits=10, test_size=0.2, random_state=seed)
     gcv = GridSearchCV(ssvm, param_grid, scoring=score_survival_model,
                        n_jobs = n_core , refit=False,
                        cv=cv)
@@ -116,16 +117,16 @@ def SurvivalSVM(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
     return scoreTraining, scoreTest, feature
 
 
-def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
+def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, seed = 123):
     from sksurv.linear_model import CoxPHSurvivalAnalysis, CoxnetSurvivalAnalysis
     from sklearn.pipeline import make_pipeline
-
+    seed = np.random.RandomState(seed)
     # let's normalize, anyway
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
     
-    model = CoxnetSurvivalAnalysis(alpha_min_ratio=0.12, l1_ratio=0.9, max_iter=100)
+    model = CoxnetSurvivalAnalysis(alpha_min_ratio=0.12, l1_ratio=0.9, max_iter=100, random_state = seed)
     #https://github.com/sebp/scikit-survival/issues/41
     
     model.set_params(max_iter = 100, n_alphas = 50)
@@ -136,7 +137,7 @@ def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
 
     
     gcv = GridSearchCV(
-    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000)),
+    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000, random_state = seed)),
     param_grid={"coxnetsurvivalanalysis__alphas": [[v] for v in alphas]},
     cv = 2,
     n_jobs= n_core).fit(X_train,y_train)
@@ -152,7 +153,7 @@ def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
     return scoreTraining, scoreTest, feature
 
 
-def SurvivalForest(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
+def SurvivalForest(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, seed = 123):
     from sksurv.ensemble import RandomSurvivalForest
     from eli5.formatters import format_as_dataframe
     from eli5.sklearn import explain_weights_sklearn
@@ -162,19 +163,19 @@ def SurvivalForest(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
-    
+    seed = np.random.RandomState(seed)
     rsf = RandomSurvivalForest(n_estimators=300,
                            min_samples_split=10,
                            min_samples_leaf=15,
                            max_features="sqrt",
                            n_jobs= n_core,
-                           random_state=1234)
+                           random_state=seed)
     
     rsf.fit(X_train, y_train)
     scoreTraining = rsf.score(X_train,y_train)
     scoreTest = rsf.score(X_test,y_test)
     
-    perm = PermutationImportance(rsf, n_iter=3, random_state=1234)
+    perm = PermutationImportance(rsf, n_iter=3, random_state=seed)
     perm.fit(X_test, y_test)
     feature = format_as_dataframe(explain_weights_sklearn(perm, feature_names=lFeature, top = len(lFeature) ))
     feature = pd.Series(feature["weight"].tolist(), index=feature["feature"].tolist())
@@ -185,17 +186,17 @@ def SurvivalForest(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 
 
 
     
-def gradient_boosted_models(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2):
+def gradient_boosted_models(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, seed = 123):
     from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 
     # let's normalize, anyway
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
-
+    seed = np.random.RandomState(seed)
     model = GradientBoostingSurvivalAnalysis(
         n_estimators=1000, learning_rate=0.05, subsample=0.5,
-        max_depth=1, random_state=0
+        max_depth=1, random_state=seed
     )
 
     monitor = EarlyStoppingMonitor(25, 100)
@@ -210,7 +211,7 @@ def gradient_boosted_models(X_train, y_train, X_test, y_test, lFeature = None,  
     return scoreTraining, scoreTest, feature
 
 
-def survival_selection(data, k = 10, topk = 100, event = "event",  n_core = 2):
+def survival_selection(data, k = 10, topk = 100, event = "event",  n_core = 2, seed = 123):
     from sksurv.datasets import get_x_y
     from sklearn.model_selection import StratifiedKFold
     import copy
@@ -228,7 +229,7 @@ def survival_selection(data, k = 10, topk = 100, event = "event",  n_core = 2):
     
     X, Y = get_x_y(data, attr_labels = [event,"time"], pos_label=0)
 
-    skf = StratifiedKFold(n_splits=k, shuffle=True)
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state = np.random.RandomState(seed))
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
     
     lFeature = X.columns.tolist()
@@ -252,7 +253,7 @@ def survival_selection(data, k = 10, topk = 100, event = "event",  n_core = 2):
             try:
                 classifier = copy.deepcopy(model)
                 scoreTraining, scoreTest, features = classifier(X_train, y_train,\
-                                                X_test, y_test, lFeature = lFeature, n_core = n_core)
+                                                X_test, y_test, lFeature = lFeature, n_core = n_core, seed = seed)
 
             except Exception as error:
                 print(error)
@@ -332,7 +333,10 @@ def get_survival_cutoff(exprDF = "exprDF", time = "time", event = "event", targe
                 tRes = (0, 1,)
             dfTemp = pd.Series({"Target":target,"Q":q,"Cutpoint":treshold,"HR":tRes[0],"pval":tRes[1]})
             df = pd.concat([df,dfTemp], axis = 1)
-    row = df.transpose().sort_values("pval").iloc[0,:]
+    df = df.transpose()
+    df["P_ADJ"] = df.pval.apply(lambda x: -1.63 * x * (1 + 2.35 * np.log(x)))
+    df = df.sort_values("P_ADJ")
+    row = df.iloc[0,:]
     return row["Q"], row["Cutpoint"]
 
 def get_hazard_ratio(exprDF, target = "exprs"):

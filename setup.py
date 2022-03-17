@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
    name='miopy',
-   version='1.0.02',
+   version='1.0.04',
    author='Pablo Monfort Lanzas',
    author_email='pablo.monfort@i-med.ac.at',
    packages=['miopy', ],

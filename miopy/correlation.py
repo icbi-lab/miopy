@@ -713,7 +713,7 @@ def rdc (exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
     return Cordf
 
 
-def hazard_ratio_mirgen(exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
+def hazard_ratio_mirgen(exprDF, table, lMirUser = None, lGeneUser = None, n_core = 2):
     """
     Function to calculate the Spearman correlation coefficient, and pval
     of each pair of miRNA-mRNA, return a matrix of correlation coefficients 
@@ -728,7 +728,8 @@ def hazard_ratio_mirgen(exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
         Pvaldf   df  A  matrix that includes the Spearman correlation 
                         pvalues. Columns are genes, rows are miRNA.
     """
-    from .survival import get_hazard_ratio, split_by_exprs
+    from .survival import hazard_ratio
+
     pandarallel.initialize(verbose=1, nb_workers=n_core)
 
     lMir, lGene = header_list(exprDF=exprDF)
@@ -740,18 +741,13 @@ def hazard_ratio_mirgen(exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
         lMir = intersection(lMir,lMirUser)
 
 
-    Cordf = exprDF[lGene].parallel_apply(lambda gene: exprDF[lMir].apply(\
-            lambda mir: get_hazard_ratio(split_by_exprs(pd.DataFrame({
-            "mir/gene": mir/gene,
-            "time": exprDF["time"].tolist(),
-            "event":exprDF["event"].tolist()
-        }),target="mir/gene"))[0]))
+    hr = hazard_ratio(exprDF=exprDF, lMirUser=lMir, lGeneUser=lGene, n_core = n_core)
+    hr.index = hr.target
 
-
-
-    Cordf = Cordf.apply(lambda col: col.dropna())
+    table["GENE_HR"] = table.apply(lambda x: hr.loc[x["Gene"],"log(hr)"], axis = 1)
+    table["MIR_HR"] = table.apply(lambda x: hr.loc[x["Mir"],"log(hr)"], axis = 1)
     
-    return Cordf 
+    return table 
 
 
 def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = False, k = 10):
@@ -791,8 +787,7 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
                 # [hazard_ratio_mirgen, "Log(HR)" ]
                  ]
     
-    if hr:
-        modelList.append([hazard_ratio_mirgen, "Log(HR)" ])
+
     print("Loading dataset...")
     
     
@@ -814,19 +809,14 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
             #dfCor.to_csv("~/%s.csv"%name)
             lTuple.append((dfCor,name))
 
-    #dfRf = randomforest(exprDF, lGeneUser=lGene, lMirUser=lMir)
-    #print("Obtain Correlation")
-        
-    #print("Merge Matrix")
-    #print(lTuple[1][0].head())
-
     table = process_matrix_list(lTuple, add_target=True)
+
     table = table.loc[~table.duplicated(), :]
-    #table = count_db(table)
-    #print(table.head())
-    #print(table.columns)
+
     table = adjPval(table)
 
+    if hr:
+        table = hazard_ratio_mirgen(exprDF, table, lGeneUser=lGene, lMirUser=lMir, n_core=n_core)
     return table, lTuple[1][0]
 
 
