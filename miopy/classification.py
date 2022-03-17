@@ -108,7 +108,7 @@ def classification_cv(data, k = 10, name = "Random Forest", group = "event", lFe
     lFeature = list(set(lFeature).intersection(data.columns.tolist()))
     X, Y = data[lFeature], label_binarize(data[group], classes = data[group].unique().tolist())[:,0]
 
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed = np.random.RandomState(seed))
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state= np.random.RandomState(seed))
     indexes = [ (training, test) for training, test in skf.split(X, Y) ]
         
     model = modelList[name]
