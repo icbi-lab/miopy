@@ -335,8 +335,10 @@ def get_survival_cutoff(exprDF = "exprDF", time = "time", event = "event", targe
             df = pd.concat([df,dfTemp], axis = 1)
     df = df.transpose()
     df["P_ADJ"] = df.pval.apply(lambda x: -1.63 * x * (1 + 2.35 * np.log(x)))
+    df = df.query("0.001 < pval < 0.1")
     df = df.sort_values("P_ADJ")
     row = df.iloc[0,:]
+    print(df)
     return row["Q"], row["Cutpoint"]
 
 def get_hazard_ratio(exprDF, target = "exprs"):
