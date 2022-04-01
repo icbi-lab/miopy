@@ -126,7 +126,7 @@ def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, s
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
     
-    model = CoxnetSurvivalAnalysis(alpha_min_ratio=0.12, l1_ratio=0.9, max_iter=100, random_state = seed)
+    model = CoxnetSurvivalAnalysis(alpha_min_ratio=0.12, l1_ratio=0.9, max_iter=100)
     #https://github.com/sebp/scikit-survival/issues/41
     
     model.set_params(max_iter = 100, n_alphas = 50)
@@ -137,7 +137,7 @@ def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, s
 
     
     gcv = GridSearchCV(
-    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000, random_state = seed)),
+    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000),
     param_grid={"coxnetsurvivalanalysis__alphas": [[v] for v in alphas]},
     cv = 2,
     n_jobs= n_core).fit(X_train,y_train)
