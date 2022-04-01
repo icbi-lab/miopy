@@ -137,7 +137,7 @@ def PenaltyCox(X_train, y_train, X_test, y_test, lFeature = None,  n_core = 2, s
 
     
     gcv = GridSearchCV(
-    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000),
+    make_pipeline(CoxnetSurvivalAnalysis(l1_ratio=0.9, max_iter=1000)),
     param_grid={"coxnetsurvivalanalysis__alphas": [[v] for v in alphas]},
     cv = 2,
     n_jobs= n_core).fit(X_train,y_train)
