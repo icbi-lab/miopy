@@ -1,8 +1,0 @@
-argparse
-eli5
-lifelines
-numpy
-pandarallel
-pandas
-ranky
-scipy
