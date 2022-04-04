@@ -1149,7 +1149,7 @@ def predict_lethality(gene, table, topk=100, method = "outer"):
 
     return topmatch
 
-def FilterDF(table = None, matrix = None, join = "or", lTool = [], low_coef = -0.5, high_coef = 0.5, pval = 0.05, analysis = "Correlation", min_db = 1):
+def FilterDF(table = None, matrix = None, join = "or", lTool = [], low_coef = -0.5, high_coef = 0.5, pval = 0.05, analysis = "Correlation", min_db = 1, method = "R"):
 
 
     dbQ = get_target_query(join, lTool)
@@ -1157,15 +1157,17 @@ def FilterDF(table = None, matrix = None, join = "or", lTool = [], low_coef = -0
 
     #Filter DF
     if analysis == "Correlation":
-        query_string = f"""
-                ((R <= {low_coef} | R >= {high_coef} ) | \
-                 (Rho <= {low_coef} | Rho >= {high_coef} ) | \
-                 (Tau <= {low_coef} | Tau >= {high_coef} ))  \
-                 & \
-                ((R_fdr_bh <= {pval}) | \
-                 (Rho_fdr_bh <= {pval}) | \
-                 (Tau_fdr_bh <= {pval}))
-        """
+        if method in ["R","Rho","Tau"]:
+            query_string = f"""
+                    (({method} <= {low_coef} | {method} >= {high_coef} )) \
+                    & \
+                    (({method}_fdr_bh <= {pval}))
+            """
+        else:
+            query_string = f"""
+                    (({method} <= {low_coef} | {method} >= {high_coef} ))
+                    """
+                    
         table = table[table["Prediction Tools"].str.match(dbQ)==True]
         table["Number Prediction Tools"] = table["Prediction Tools"].str.count("1")
         table = table[table["Number Prediction Tools"] >= min_db]
