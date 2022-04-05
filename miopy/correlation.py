@@ -40,21 +40,24 @@ def adjust_geneset(table):
 def adjPval(df):
     from statsmodels.stats.multitest import multipletests
     
-    lCor = ["Rho","R","Tau"]
+    lCor = ["Rho","R","Tau","Background"]
     method = "fdr_bh"
 
     for cor in lCor:
         col = "%s_%s"  %(cor,method)
         col_raw = "%s_Pval" %(cor)
 
-        #Pval 
-        p = df[col_raw]
-        mask = np.isfinite(p)
+        #Pval
+        try: 
+            p = df[col_raw]
+            mask = np.isfinite(p)
 
-        #Creating an empty vector
-        df[col] = 1
+            #Creating an empty vector
+            df[col] = 1
 
-        df.loc[mask,col] = multipletests(p[mask], method=method)[1]
+            df.loc[mask,col] = multipletests(p[mask], method=method)[1]
+        except:
+            pass
 
     return df
 
@@ -223,7 +226,7 @@ def CoefLarsCV(x, y, n_core = 4):
     return coef 
 
 
-def CoefLassoCV(X, Y, k = 5, n_core = 4):
+def CoefLassoCV(X, Y, k = 3, n_core = 4):
     from sklearn.linear_model import Lasso, LassoCV
     from sklearn.model_selection import train_test_split
 
@@ -285,7 +288,7 @@ def CoefRandomForest(x, y, n_core = 4):
     return coef
 
 
-def CoefElasticNetCV(X, Y, k=5, n_core = 4):
+def CoefElasticNetCV(X, Y, k=3, n_core = 4):
     from sklearn.linear_model import ElasticNetCV,ElasticNet
     from sklearn.model_selection import train_test_split
 
@@ -306,7 +309,7 @@ def CoefElasticNetCV(X, Y, k=5, n_core = 4):
     return dfTopCoefTemp.apply(lambda row: row.mean(), axis=1) 
 
 
-def CoefRidgeCV(X,Y,k=5):
+def CoefRidgeCV(X,Y,k=3):
     from sklearn.linear_model import Ridge, RidgeCV
 
     alphas = np.logspace(-10, -2, 10)
@@ -746,13 +749,13 @@ def hazard_ratio_mirgen(exprDF, table, lMirUser = None, lGeneUser = None, n_core
     hr = hazard_ratio(exprDF=exprDF, lMirUser=lMir, lGeneUser=lGene, n_core = n_core)
     hr.index = hr.target
 
-    table["GENE_HR"] = table.apply(lambda x: hr.loc[x["Gene"],"log(hr)"], axis = 1)
-    table["MIR_HR"] = table.apply(lambda x: hr.loc[x["Mir"],"log(hr)"], axis = 1)
+    table["HR_GENE"] = table.apply(lambda x: hr.loc[x["Gene"],"log(hr)"], axis = 1)
+    table["HR_MIR"] = table.apply(lambda x: hr.loc[x["Mir"],"log(hr)"], axis = 1)
     
     return table 
 
 
-def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = False, k = 10):
+def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = False, k = 10, background = True, test = False):
     """
     Function to calculate all coefficient
     of each pair of miRNA-mRNA, return a matrix of correlation coefficients 
@@ -777,17 +780,22 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
 
     print("Obtain Concat Gene and MIR")
 
-    
-    modelList = [[spearman,"Rho"],
-                 [pearson,"R"],
-                 [kendall,"Tau"],
-                 [rdc, "RDC"],
-                 [hoeffding,"Hoeffding"],
-                 [ridge,"Ridge"],
-                 [lasso,"Lasso"],
-                 [elasticnet,"ElasticNet"],
-                # [hazard_ratio_mirgen, "Log(HR)" ]
-                 ]
+    if test:
+        modelList = [[spearman,"Rho"],
+                    [pearson,"R"],
+                    [kendall,"Tau"],
+                    ]
+    else:
+        modelList = [[spearman,"Rho"],
+                    [pearson,"R"],
+                    [kendall,"Tau"],
+                    [rdc, "RDC"],
+                    [hoeffding,"Hoeffding"],
+                    [ridge,"Ridge"],
+                    [lasso,"Lasso"],
+                    [elasticnet,"ElasticNet"],
+                    # [hazard_ratio_mirgen, "Log(HR)" ]
+                    ]
     
 
     print("Loading dataset...")
@@ -815,13 +823,126 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
 
     table = table.loc[~table.duplicated(), :]
 
-    table = adjPval(table)
 
     if hr:
+        print("\nHazard Ratio")
         table = hazard_ratio_mirgen(exprDF, table, lGeneUser=lGene, lMirUser=lMir, n_core=n_core)
+
+    if background:
+        print("\nBackground")
+        table = background_estimation(exprDF, table, n_gene=3000, n_core=n_core, pval=False)
+        
+    table = adjPval(table)
+
     return table, lTuple[1][0]
 
 
+#################
+### Background ##
+#################
+def process_zscore(lMir, table_random):
+    lMean = []
+    lStd = []
+    for mir in lMir:
+        x = table_random.loc[table_random.Mir == mir,:].R.tolist()
+        try:
+            mean = np.mean(x)
+            standard_deviation = np.std(x)
+        except:
+            mean = np.nan
+            standard_deviation = np.nan
+        finally:
+            lMean.append(mean)
+            lStd.append(standard_deviation)
+            
+    df = pd.DataFrame({"Mir":lMir,"Mean":lMean,"Standard Deviation":lStd})
+    
+    return df
+
+
+def get_mean_deviation(table_random, n_core = 4):
+    import functools
+    from multiprocessing import Pool
+
+    ### Intersect with Gene and Mir from table##
+    lMir = table_random.Mir.unique().tolist()
+
+    ##Split List
+    np_list_split = np.array_split(lMir, n_core)
+    split_list = [i.tolist() for i in np_list_split]
+    #split_list = same_length(split_list)
+
+    #Fix Exprs Variable
+    partial_func = functools.partial(process_zscore, table_random=table_random)
+
+    #Generating Pool
+    pool = Pool(n_core)
+    lres = pool.map(partial_func, split_list)
+    res = pd.concat(lres)
+    pool.close() 
+    pool.join()
+    return res
+
+
+def z_score(value, mean, std):
+    return (value - mean) / std
+
+
+def background_estimation(exprDF, table, n_gene = 3000, method = "R", n_core = 6, pval = False):
+    """
+    Function to calculate the Pearson correlation coefficient, and pval
+    of each pair of miRNA-mRNA, return a matrix of correlation coefficients 
+    with columns are miRNAs and rows are mRNAs.
+
+    Args:   
+        exprDF  df Concat Dataframe rows are samples and cols are gene/mirs
+
+    Returns:
+        Cordf   df  A  matrix that includes the Pearson correlation 
+                        coefficients. Columns are genes, rows are miRNA.
+        Pvaldf   df  A  matrix that includes the Pearson correlation 
+                        pvalues. Columns are genes, rows are miRNA.
+    """
+    import random 
+    from pandarallel import pandarallel
+    pandarallel.initialize(verbose=1, nb_workers=n_core)
+
+    lMir, lGene = header_list(exprDF=exprDF)
+
+    #Select Random Genes for correlation
+    random.seed(10)
+    lGene = random.sample(lGene, n_gene)
+
+    dfCor, dfPval = pearson(exprDF, lGeneUser = lGene, n_core = n_core, pval = pval)
+
+    ## Get table with number
+    table_random = process_matrix_list([(dfCor,"R")], add_target=True)
+    table_random["Number"] = table_random["Prediction Tools"].str.count("1")
+    table_filter = table_random.loc[table_random["Number"] <= 1,:]
+
+    #Get Mean and Std
+    res = get_mean_deviation(table_filter)
+    res.index = res.Mir
+    
+    #Get Z-score, and P-value
+    res_z_p = table.parallel_apply(lambda row: \
+                              z_score_value(row.R, res, row.Mir), axis = 1)
+    #print(res_z_p)
+    #res_z_p = res_z_p.apply(lambda col: col.dropna())
+    table["Background Z-Score"] = res_z_p.apply(lambda x: x[0])
+    table["Background_Pval"] = res_z_p.apply(lambda x: x[1])
+
+    return table
+
+def z_score_value(x, res, mir):
+    from scipy.stats import norm
+
+    try:
+        z = z_score(x, res.loc[mir,"Mean"], res.loc[mir,"Standard Deviation"])
+        p_value = norm.cdf(x=x,loc=res.loc[mir,"Mean"],scale=res.loc[mir,"Standard Deviation"])
+    except:
+        z, p_value = 0, 1
+    return z, p_value
 
 #################
 ### Reshaping ###
