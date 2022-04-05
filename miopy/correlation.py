@@ -342,7 +342,7 @@ def CoefRidge(x, y):
 ##################
 ## Correlation ###
 ##################
-def pearson(exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
+def pearson(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, pval = True):
     """
     Function to calculate the Pearson correlation coefficient, and pval
     of each pair of miRNA-mRNA, return a matrix of correlation coefficients 
@@ -370,9 +370,11 @@ def pearson(exprDF, lMirUser = None, lGeneUser = None, n_core = 2):
 
     Cordf = exprDF[lGene].parallel_apply(lambda gene: exprDF[lMir].corrwith(gene, \
             method = lambda x, y: scipy.stats.pearsonr(x,y)[0]))
-
-    Pvaldf = exprDF[lGene].parallel_apply(lambda gene: exprDF[lMir].corrwith(gene, \
-            method = lambda x, y: scipy.stats.pearsonr(x,y)[1]))
+    if pval:
+        Pvaldf = exprDF[lGene].parallel_apply(lambda gene: exprDF[lMir].corrwith(gene, \
+                method = lambda x, y: scipy.stats.pearsonr(x,y)[1]))
+    else:
+        Pvaldf = pd.DataFrame()
 
     Cordf = Cordf.apply(lambda col: col.dropna())
     Pvaldf = Pvaldf.apply(lambda col: col.dropna())
