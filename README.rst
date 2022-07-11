@@ -52,6 +52,5 @@ Please use the `issue tracker <https://github.com/icbi-lab/miopy/issues>`_.
 
 Citation
 ^^^^^^^^
-_Please cite as:_  
 
-Monfort-Lanzas P, Gronauer R, Madersbacher L, et al. MIO: MicroRNA target analysis system for Immuno-Oncology. Bioinformatics (Oxford, England). 2022 Jun:btac366. DOI: [10.1093/bioinformatics/btac366](https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/btac366/6596596?login=true). PMID: [35642895](https://pubmed.ncbi.nlm.nih.gov/35642895/). 
+Monfort-Lanzas P, Gronauer R, Madersbacher L, et al. MIO: MicroRNA target analysis system for Immuno-Oncology. Bioinformatics (Oxford, England). 2022 Jun:btac366. DOI: 10.1093/bioinformatics/btac366. PMID: 35642895
