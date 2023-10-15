@@ -1,7 +1,7 @@
 Cython==3.0.2
 matplotlib==3.4.1
 pandarallel==1.5.2
-pandas==2.1.1
+pandas==2.0.0
 pandastable==0.12.2.post1
 plotly==4.14.3
 python-Levenshtein==0.12.2
