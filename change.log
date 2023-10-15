@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.1] - 2022-01-10
 ### Added
-- [MIOPY-1001]
+- [MIOPY-1001]s
   Create geneset adjust pval
   Move some functions to process_data
 
@@ -34,3 +34,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - [MIOPY-1004]
   Add Altman p-value correction to get_survival_cutoff
+## [1.1.0] - 2022-03-17
+### Added
+- [MIOPY-1010]
+  Add immune package with the ips score functions
+  Add microrna_ips correlation in correlation package

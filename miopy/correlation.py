@@ -1,24 +1,27 @@
-###############
-#### AMYR #####
-###############
-import re
-from typing import DefaultDict
-from pandas.core.reshape.concat import concat
-import scipy.stats    
-import pandas as pd
-from .R_utils import tmm_normalization, deg_edger, deg_limma_array, voom_normalization
-import numpy as np
-import ranky as rk
-from pandarallel import pandarallel
-from os import path
-import io
-from sklearn.model_selection import StratifiedKFold, KFold
-from statsmodels.stats.multitest import multipletests
-from multiprocessing import Pool
-import numpy as np
-import functools
-from .process_data import *
+################
+#### MIOPY #####
+################
 
+import pandas as pd
+import numpy as np
+from pandarallel import pandarallel
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.linear_model import LarsCV, Lasso, LassoCV, ElasticNetCV, ElasticNet, Ridge, RidgeCV
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import RandomizedSearchCV
+from statsmodels.stats.multitest import multipletests
+
+from os import path
+from .R_utils import tmm_normalization, deg_edger, deg_limma_array, voom_normalization
+from .process_data import *
+from .immune import ips
+from .data import load_gene_ips
+from multiprocessing import Pool
+import functools
+
+import scipy.stats
+import ranky as rk
+from .process_data import *
 
 ##################
 ## Miscelaneos ###
@@ -26,7 +29,11 @@ from .process_data import *
 
 
 def adjust_geneset(table):
-    from statsmodels.stats.multitest import multipletests
+    """
+    Function to adjust the p-values of the geneset
+    Args:
+        table   df  Dataframe long table with the pvalues from the geneset
+    """
 
     p = table["Pval"]
     mask = np.isfinite(p)
@@ -37,13 +44,19 @@ def adjust_geneset(table):
     return table
     
 
-def adjPval(df):
-    from statsmodels.stats.multitest import multipletests
-    
-    lCor = ["Rho","R","Tau","Background"]
+def adj_pval(df):
+    """
+    Function to adjust the p-values of the correlation results
+    Args:
+        df  df  Dataframe with the correlation results
+    Returns:
+        df  df  Dataframe with the correlation results and the adjusted pvalues
+    """
+
+    l_cor = ["Rho","R","Tau","Background"]
     method = "fdr_bh"
 
-    for cor in lCor:
+    for cor in l_cor:
         col = "%s_%s"  %(cor,method)
         col_raw = "%s_Pval" %(cor)
 
@@ -56,8 +69,8 @@ def adjPval(df):
             df[col] = 1
 
             df.loc[mask,col] = multipletests(p[mask], method=method)[1]
-        except:
-            pass
+        except Exception as e:
+            print(e)
 
     return df
 
@@ -66,8 +79,15 @@ def adjPval(df):
 ## GeneSetScore ##
 ##################
 def calculate_gene_set_score(expr, conf):
-    #print(row)
-    #print(conf)
+    """
+    Function to calculate the GeneSetScore
+    Args:
+        expr    df  Dataframe with the expression of the genes
+        conf    df  Dataframe with the targeting of the genes
+    Returns:
+        GScore  float   GeneSetScore
+    """
+
     sum_gene_predictor = sum(expr * conf)
     sum_predictor = sum(conf)
     
@@ -78,49 +98,97 @@ def calculate_gene_set_score(expr, conf):
     #print(GScore)
     return GScore
 
+def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None, n_core=2):
+    """
+    Calculate the correlation between a GeneSet and the expression of microRNA, considering microRNA/gene targeting.
 
-def gene_set_correlation(exprDf, lGeneSet, GeneSetName = "GeneSet", lMirUser = None, n_core = 2):
+    Args:
+        exprDf (DataFrame): Dataframe with gene expression data.
+        lGeneSet (list): List of genes in the GeneSet.
+        GeneSetName (str): Name of the GeneSet.
+        lMirUser (list): List of microRNA to use.
+        n_core (int): Number of CPU cores to use for parallel processing.
+
+    Returns:
+        dfCor (DataFrame): Dataframe with correlation values between the GeneSet and microRNA.
+        dfPval (DataFrame): Dataframe with p-values of the correlation between the GeneSet and microRNA.
+        dfSetScore (DataFrame): Dataframe with the GeneSetScore of the GeneSet.
+    """
+
+    # Initialize parallel processing with the specified number of cores
+    pandarallel.initialize(verbose=1, nb_workers=n_core)
+
+    # Extract the list of microRNA and gene names from the expression dataframe
+    lMir, lGene = header_list(exprDF=exprDf)
+
+    # Load a confident dataframe and count "1" occurrences in the expression matrix
+    dfConf = get_confident_df(load_matrix_counts().apply(lambda col: col.str.count("1")))
+
+    # Intersect gene and microRNA lists with the confident dataframe indices and columns
+    lGene = intersection(lGene, dfConf.index.tolist())
+    lMir = intersection(lMir, dfConf.columns.tolist())
+
+    # Intersect the gene list with the provided GeneSet if it is given
+    if lGeneSet is not None:
+        lGene = intersection(lGene, lGeneSet)
+
+    # Intersect the microRNA list with the provided list if it is given
+    if lMirUser is not None:
+        lMir = intersection(lMir, lMirUser)
+
+    # Calculate the GeneSetScore for each microRNA and gene pair using parallel processing
+    dfSetScore = dfConf.loc[lGene, lMir].parallel_apply(lambda conf:
+                                                        exprDf[lGene].apply(lambda expr:
+                                                                           calculate_gene_set_score(expr, conf),
+                                                                           axis=1), axis=0)
+
+    # Remove columns with NaN values from the GeneSetScore dataframe
+    dfSetScore = dfSetScore.apply(lambda col: col.dropna())
+
+    # Calculate the correlation between GeneSetScore and gene expression for each microRNA
+    cor = dfSetScore.parallel_apply(lambda col:
+                                   col.corr(exprDf[col.name], method=lambda x, y: scipy.stats.pearsonr(x, y)))
+
+    # Remove columns with NaN values from the correlation dataframe
+    cor = cor.apply(lambda col: col.dropna())
+
+    # Create dataframes for correlation and p-values
+    dfPval = pd.DataFrame(cor.loc[:, 1])
+    dfCor = pd.DataFrame(cor.loc[:, 0])
+
+    # Rename the columns with the GeneSetName
+    dfPval.columns = [GeneSetName]
+    dfCor.columns = [GeneSetName]
+
+    return dfCor, dfPval, dfSetScore
+
+###########################
+##### Immunephenoscore ####
+###########################
+
+
+def ips_correlation(exprDf, lMirUser = None, n_core = 2):
 
     pandarallel.initialize(verbose=1, nb_workers=n_core)
 
     lMir, lGene = header_list(exprDF=exprDf)
 
-    dfConf = get_confident_df(load_matrix_counts().apply(lambda col: col.str.count("1")))
-    
-    ### Intersect with Gene and Mir from table##
-    lGene = intersection(lGene, dfConf.index.tolist())
-    lMir = intersection(lMir, dfConf.columns.tolist())
-
-    if lGeneSet is not None:
-        lGene = intersection(lGene,lGeneSet)
 
     if lMirUser is not None:
         lMir = intersection(lMir,lMirUser)
     
-    #print(lGene)
-    #print(lMir)
-    #print(dfConf.loc[lGene,lMir])
+    gene_ips = load_gene_ips()
 
-    dfSetScore = dfConf.loc[lGene,lMir].parallel_apply(lambda conf: \
-                      exprDf[lGene].apply(lambda expr: \
-                      calculate_gene_set_score(expr, conf), \
-                      axis = 1), axis = 0)
+    dfIPS = exprDf[lGene].parallel_apply(lambda x: \
+                      ips(x, gene_ips), \
+                      axis = 1)
                       
-    dfSetScore = dfSetScore.apply(lambda col: col.dropna()) 
+    dfExpr = pd.concat((dfIPS,exprDf[lMir]), axis = 1)
 
-    cor = dfSetScore.parallel_apply(lambda col: col.corr(exprDf[col.name],method =  \
-            lambda x, y: scipy.stats.pearsonr(x, y)))
+    table, dfCor = all_methods(dfExpr, lMirUser = lMir, lGeneUser = ["AZ",], n_core = n_core, hr = False, k = 5, background = False, test = False, add_target = False)
     
-    cor = cor.apply(lambda col: col.dropna())
-    df = pd.DataFrame(cor).transpose()
+    return table, dfCor, dfIPS
 
-    dfPval = pd.DataFrame(df.loc[:,1])
-    dfCor = pd.DataFrame(df.loc[:,0])    
-
-    dfPval.columns = [GeneSetName]
-    dfCor.columns = [GeneSetName]
-
-    return dfCor, dfPval, dfSetScore
 
 
 ##################
@@ -210,141 +278,227 @@ def voom_normal(fPath, bFilter=True):
 ##################
 
 
-def CoefLarsCV(x, y, n_core = 4):
-    from sklearn.linear_model import LarsCV, Lars
-    from sklearn.model_selection import train_test_split
+def CoefLarsCV(x, y, n_core=4):
+    """
+    Compute the coefficients using the Least Angle Regression (LARS) Cross-Validation.
 
-    X_train, X_test , y_train, y_test = \
-    train_test_split(x, y, test_size=0.2, random_state=1)
+    Args:
+        x (DataFrame): Features data.
+        y (Series): Target variable.
+        n_core (int): Number of CPU cores to use for parallel processing.
 
-    ## CrossValidation
-    larscv = LarsCV(cv = 5, normalize=True)
+    Returns:
+        coef (Series): Coefficients obtained from LARS CV.
+    """
+
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+    # Cross-validation with LARS
+    larscv = LarsCV(cv=5, normalize=True)
     larscv.fit(X_train, y_train)
 
-    coef = pd.Series(larscv.coef_, index = x.columns)
-
-    return coef 
-
-
-def CoefLassoCV(X, Y, k = 3, n_core = 4):
-    from sklearn.linear_model import Lasso, LassoCV
-    from sklearn.model_selection import train_test_split
-
-    skf = KFold(n_splits=k, shuffle=True)
-    indexes = [ (training, test) for training, test in skf.split(X, Y) ]
-        # iterate over all folds
-
-    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)        
-    for train_index, test_index in indexes:
-        X_train, X_test = X.iloc[train_index,:], X.iloc[test_index,:]
-        y_train, y_test = Y[train_index], Y[test_index]
-        ## CrossValidation
-        lassocv = LassoCV(cv = 5, max_iter=1000, normalize=True)
-        lassocv.fit(X_train, y_train)
-        lasso = Lasso(max_iter = 1e4, alpha=lassocv.alpha_).fit(X_train, y_train)
-        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(lasso.coef_, index = X.columns).fillna(0)], axis = 1)
-        #print(dfTopCoefTemp.apply(lambda row: row.mean(), axis=1))
-    return dfTopCoefTemp.apply(lambda row: row.mean(), axis=1) 
-
-
-def CoefLasso(x, y):
-    from sklearn.linear_model import Lasso
-
-    alphas = [0.001, 0.02, 0.01, 0.1, 0.5, 1, 5]
-
-    lasso = Lasso(alpha = 1, max_iter = 1e4 ).fit(x, y)
-
-    coef = pd.Series(lasso.coef_, index=x.columns)
-    #coef = coef.sort_values(0, ascending=False)
-
-    return coef 
-
-def CoefRandomForest(x, y, n_core = 4):
-    from sklearn.model_selection import train_test_split
-    from sklearn.ensemble import RandomForestRegressor
-    from sklearn.model_selection import RandomizedSearchCV
-    #from treeinterpreter import treeinterpreter as ti
-
-
-    X_train, X_test , y_train, y_test = \
-    train_test_split(x, y, test_size=0.2, random_state=1)
-
-    rf = RandomizedSearchCV(RandomForestRegressor(),\
-    param_distributions =  {
-                  'n_estimators':np.arange(10,500,5)
-                  #'max_features':np.arange(1,10,1)
-               },
-                  cv=5, n_iter = 20,
-                  iid=False,random_state=0,refit=True,
-                  scoring="neg_mean_absolute_error", n_jobs = n_core)
-
-    rf.fit(X_train,y_train)
-    rf = rf.best_estimator_
-    prediction, bias, contributions = rf.predict(rf, X_test)
-
-    totalc1 = np.mean(contributions, axis=0)
-    coef = pd.Series(totalc1, index=x.columns)
+    # Get coefficients as a Series
+    coef = pd.Series(larscv.coef_, index=x.columns)
 
     return coef
 
+def CoefLassoCV(X, Y, k=3, n_core=4):
+    """
+    Compute the coefficients using Lasso with Cross-Validation.
 
-def CoefElasticNetCV(X, Y, k=3, n_core = 4):
-    from sklearn.linear_model import ElasticNetCV,ElasticNet
-    from sklearn.model_selection import train_test_split
+    Args:
+        X (DataFrame): Features data.
+        Y (Series): Target variable.
+        k (int): Number of folds for cross-validation.
+        n_core (int): Number of CPU cores to use for parallel processing.
+
+    Returns:
+        coef (Series): Mean coefficients obtained from Lasso CV.
+    """
+
+    # Split data into k-folds for cross-validation
+    skf = KFold(n_splits=k, shuffle=True)
+    indexes = [(training, test) for training, test in skf.split(X, Y)]
+
+    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)
+
+    for train_index, test_index in indexes:
+        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
+        y_train, y_test = Y[train_index], Y[test_index]
+
+        # Cross-validation with Lasso
+        lassocv = LassoCV(cv=5, max_iter=1000, normalize=True)
+        lassocv.fit(X_train, y_train)
+        lasso = Lasso(max_iter=1e4, alpha=lassocv.alpha_).fit(X_train, y_train)
+
+        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(lasso.coef_, index=X.columns).fillna(0)], axis=1)
+
+    # Compute the mean coefficients
+    coef = dfTopCoefTemp.apply(lambda row: row.mean(), axis=1)
+
+    return coef
+
+def CoefLasso(x, y):
+    """
+    Compute the coefficients using Lasso.
+
+    Args:
+        x (DataFrame): Features data.
+        y (Series): Target variable.
+
+    Returns:
+        coef (Series): Coefficients obtained from Lasso.
+    """
+
+    alphas = [0.001, 0.02, 0.01, 0.1, 0.5, 1, 5]
+
+    # Lasso regression with a specific alpha
+    lasso = Lasso(alpha=1, max_iter=1e4).fit(x, y)
+
+    # Get coefficients as a Series
+    coef = pd.Series(lasso.coef_, index=x.columns)
+
+    return coef
+
+def CoefRandomForest(x, y, n_core=4):
+    """
+    Compute feature importances using Random Forest Regressor.
+
+    Args:
+        x (DataFrame): Features data.
+        y (Series): Target variable.
+        n_core (int): Number of CPU cores to use for parallel processing.
+
+    Returns:
+        coef (Series): Feature importances obtained from Random Forest.
+    """
+ 
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+    # Hyperparameter tuning with RandomizedSearchCV
+    rf = RandomizedSearchCV(RandomForestRegressor(),
+                           param_distributions={
+                               'n_estimators': np.arange(10, 500, 5)
+                           },
+                           cv=5, n_iter=20,
+                           iid=False, random_state=0, refit=True,
+                           scoring="neg_mean_absolute_error", n_jobs=n_core)
+    rf.fit(X_train, y_train)
+    rf = rf.best_estimator_
+
+    # Calculate feature importances
+    importances = rf.feature_importances_
+
+    # Create a Series of feature importances
+    coef = pd.Series(importances, index=x.columns)
+
+    return coef
+
+def CoefElasticNetCV(X, Y, k=3, n_core=4):
+    """
+    Compute the coefficients using Elastic Net with Cross-Validation.
+
+    Args:
+        X (DataFrame): Features data.
+        Y (Series): Target variable.
+        k (int): Number of folds for cross-validation.
+        n_core (int): Number of CPU cores to use for parallel processing.
+
+    Returns:
+        coef (Series): Mean coefficients obtained from Elastic Net CV.
+    """
 
     alphas = [0.001, 0.02, 0.01, 0.1, 0.5, 1, 5]
 
     skf = KFold(n_splits=k, shuffle=True)
-    indexes = [ (training, test) for training, test in skf.split(X, Y) ]
-        # iterate over all folds
-    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)        
+    indexes = [(training, test) for training, test in skf.split(X, Y)]
+
+    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)
+
     for train_index, test_index in indexes:
-        X_train, X_test = X.iloc[train_index,:], X.iloc[test_index,:]
+        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
         y_train, y_test = Y[train_index], Y[test_index]
-        elasticcv = ElasticNetCV(alphas=alphas, cv = 5, max_iter=1000, normalize=True)
+
+        # Cross-validation with Elastic Net
+        elasticcv = ElasticNetCV(alphas=alphas, cv=5, max_iter=1000, normalize=True)
         elasticcv.fit(X_train, y_train)
         elastic = ElasticNet(alpha=elasticcv.alpha_, max_iter=1e4, normalize=True).fit(X_train, y_train)
-        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(elastic.coef_, index = X.columns).fillna(0)], axis = 1)
 
-    return dfTopCoefTemp.apply(lambda row: row.mean(), axis=1) 
+        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(elastic.coef_, index=X.columns).fillna(0)], axis=1)
 
+    # Compute the mean coefficients
+    coef = dfTopCoefTemp.apply(lambda row: row.mean(), axis=1)
 
-def CoefRidgeCV(X,Y,k=3):
-    from sklearn.linear_model import Ridge, RidgeCV
+    return coef
+
+def CoefRidgeCV(X, Y, k=3):
+    """
+    Compute the coefficients using Ridge with Cross-Validation.
+
+    Args:
+        X (DataFrame): Features data.
+        Y (Series): Target variable.
+        k (int): Number of folds for cross-validation.
+
+    Returns:
+        coef (Series): Mean coefficients obtained from Ridge CV.
+    """
 
     alphas = np.logspace(-10, -2, 10)
+
     skf = KFold(n_splits=k, shuffle=True)
-    indexes = [ (training, test) for training, test in skf.split(X, Y) ]
-        # iterate over all folds
-    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)        
+    indexes = [(training, test) for training, test in skf.split(X, Y)]
+
+    dfTopCoefTemp = pd.DataFrame(dtype='float64', index=X.columns).fillna(0)
+
     for train_index, test_index in indexes:
-        X_train, X_test = X.iloc[train_index,:], X.iloc[test_index,:]
+        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
         y_train, y_test = Y[train_index], Y[test_index]
-        ridgecv = RidgeCV(alphas=alphas, cv = 5, normalize=True)
+
+        # Cross-validation with Ridge
+        ridgecv = RidgeCV(alphas=alphas, cv=5, normalize=True)
         ridgecv.fit(X_train, y_train)
         ridge = Ridge(alpha=ridgecv.alpha_, max_iter=1e4, normalize=True).fit(X_train, y_train)
-        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(ridge.coef_, index = X.columns).fillna(0)], axis =1)
 
-    return dfTopCoefTemp.apply(lambda row: row.mean(), axis=1) 
+        dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(ridge.coef_, index=X.columns).fillna(0)], axis=1)
 
+    # Compute the mean coefficients
+    coef = dfTopCoefTemp.apply(lambda row: row.mean(), axis=1)
+
+    return coef
 
 def CoefRidge(x, y):
-    from sklearn.linear_model import Ridge, RidgeCV
-    from sklearn.model_selection import train_test_split
+    """
+    Compute the coefficients using Ridge.
 
-    X_train, X_test , y_train, y_test = \
-    train_test_split(x, y, test_size=0.2, random_state=1)
+    Args:
+        x (DataFrame): Features data.
+        y (Series): Target variable.
 
-    ridge6 = Ridge(alpha = 0.01, normalize=True)
+    Returns:
+        coef (Series): Coefficients obtained from Ridge.
+    """
+
+    alphas = [0.001, 0.02, 0.01, 0.1, 0.5, 1, 5]
+
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+    # Ridge regression with a specific alpha
+    ridge6 = Ridge(alpha=0.01, normalize=True)
     ridge6.fit(X_train, y_train)
 
-    coef = pd.Series(ridge6.coef_, index=x.columns) 
+    # Get coefficients as a Series
+    coef = pd.Series(ridge6.coef_, index=x.columns)
 
     return coef
 
 ##################
 ## Correlation ###
 ##################
+
 def pearson(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, pval = True):
     """
     Function to calculate the Pearson correlation coefficient, and pval
@@ -755,7 +909,26 @@ def hazard_ratio_mirgen(exprDF, table, lMirUser = None, lGeneUser = None, n_core
     return table 
 
 
-def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = False, k = 10, background = True, test = False):
+def filter_low_express_feature(exprDF, treshold = 5, sample_percentage = 0.4):
+    """
+    Function to filter the low expressed miRNA and mRNA.
+    Args:   
+        exprDF  df Concat Dataframe rows are samples and cols are gene/mirs
+        treshold int treshold of min number of reads
+        sample_percentage float percentage of samples that have more than treshold reads
+    Returns:
+        dfExprs_filtered   df  A  matrix that includes the filtered expression matrix
+    """
+    # Set expression threshold and sample percentage for filtering
+    threshold = np.log2(treshold)
+
+    # Filter features with low expression in more than 90% of samples
+    dfExprs_filtered = exprDF.loc[:, (exprDF > threshold).sum(axis=0) / exprDF.shape[0] >= sample_percentage]
+    return dfExprs_filtered
+
+
+def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = False, k = 10, background = True, \
+                test = False, add_target = True, filter_low_express = True):
     """
     Function to calculate all coefficient
     of each pair of miRNA-mRNA, return a matrix of correlation coefficients 
@@ -769,6 +942,8 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
     """
     import copy
 
+    if filter_low_express:
+        exprDF = filter_low_express_feature(exprDF)
 
     lMir, lGene = header_list(exprDF=exprDF)
    
@@ -779,7 +954,13 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
         lMir = intersection(lMir,lMirUser)
 
     print("Obtain Concat Gene and MIR")
-
+    print("Number of genes: " + str(len(lGene)),flush=True)
+    print("Number of miRNAs: " + str(len(lMir)),flush=True)
+    print("Number of samples: " + str(exprDF.shape[0]),flush=True)
+    print("Number of features: " + str(exprDF.shape[1]),flush=True)
+    print(lMirUser,flush=True)
+    print(exprDF.head(),flush=True)
+    
     if test:
         modelList = [[spearman,"Rho"],
                     [pearson,"R"],
@@ -819,7 +1000,7 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
             #dfCor.to_csv("~/%s.csv"%name)
             lTuple.append((dfCor,name))
 
-    table = process_matrix_list(lTuple, add_target=True)
+    table = process_matrix_list(lTuple, add_target=add_target)
 
     table = table.loc[~table.duplicated(), :]
 
@@ -832,7 +1013,7 @@ def all_methods(exprDF, lMirUser = None, lGeneUser = None, n_core = 2, hr = Fals
         print("\nBackground")
         table = background_estimation(exprDF, table, n_gene=3000, n_core=n_core, pval=False)
         
-    table = adjPval(table)
+    table = adj_pval(table)
 
     return table, lTuple[1][0]
 
@@ -1300,6 +1481,18 @@ def FilterDF(table = None, matrix = None, join = "or", lTool = [], low_coef = -0
                 ((R <= {low_coef} | R >= {high_coef} ) \
                 &  (FDR <= {pval}))
         """
+    else:
+        if method in ["R","Rho","Tau"]:
+            query_string = f"""
+                    (({method} < {low_coef} | {method} > {high_coef} )) \
+                    & \
+                    (({method}_fdr_bh < {pval}))
+            """
+        else:
+            query_string = f"""
+                    (({method} < {low_coef} | {method} > {high_coef} ))
+                    """
+
     table = table.query(query_string)#Query the Correlation Table
     table = borda_table(table)
     #print("Filtrado")
@@ -1313,11 +1506,15 @@ def FilterDF(table = None, matrix = None, join = "or", lTool = [], low_coef = -0
         try:
             matrix = matrix.loc[mir,gene]#Subset the Correlation matrix to the heatmap
         except:
-            matrix = matrix.loc[gene,mir]#Subset the Correlation matrix to the heatmap
+            try:
+                matrix = matrix.loc[gene,mir]#Subset the Correlation matrix to the heatmap
+            except:
+                matrix = None
 
         return table, matrix
     else:
-        return table
+        matrix = None
+        return table, matrix
 
 
 def predict_target(table = None, matrix = None, lTarget = None, lTools = None, method = "or", min_db = 10, low_coef = -0.5, high_coef = 0.5, pval = 0.05):
