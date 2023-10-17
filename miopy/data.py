@@ -9,7 +9,7 @@ import zipfile
 resources = {
     "target_matrix" :  "https://data.mendeley.com/public-files/datasets/nxcrssvwgs/files/aead9866-5692-4ae6-92c3-c3c1c7f92311/file_downloaded",
     "target_table" : "https://data.mendeley.com/public-files/datasets/nxcrssvwgs/files/4f9096f1-55d3-4ef8-bb5d-6c86df314675/file_downloaded",
-    "mio_datasets": "https://data.mendeley.com/public-files/datasets/nxcrssvwgs/files/becded40-6725-4bf0-acfc-d2b1c9ae18a0/file_downloaded"
+    "mio_datasets": "https://data.mendeley.com/public-files/datasets/nxcrssvwgs/files/0e6f58ba-6e68-494c-bd1b-80fe9a978815/file_downloaded"
 }
     
 ###############################################################################
