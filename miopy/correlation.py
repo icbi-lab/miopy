@@ -98,7 +98,7 @@ def calculate_gene_set_score(expr, conf):
     #print(GScore)
     return GScore
 
-def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None, n_core=2):
+def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None, n_core=6):
     """
     Calculate the correlation between a GeneSet and the expression of microRNA, considering microRNA/gene targeting.
 
@@ -295,7 +295,7 @@ def CoefLarsCV(x, y, n_core=4):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
 
     # Cross-validation with LARS
-    larscv = LarsCV(cv=5, normalize=True)
+    larscv = LarsCV(cv=5)
     larscv.fit(X_train, y_train)
 
     # Get coefficients as a Series
@@ -328,7 +328,7 @@ def CoefLassoCV(X, Y, k=3, n_core=4):
         y_train, y_test = Y[train_index], Y[test_index]
 
         # Cross-validation with Lasso
-        lassocv = LassoCV(cv=5, max_iter=1000, normalize=True)
+        lassocv = LassoCV(cv=5, max_iter=1000)
         lassocv.fit(X_train, y_train)
         lasso = Lasso(max_iter=1e4, alpha=lassocv.alpha_).fit(X_train, y_train)
 
@@ -422,9 +422,9 @@ def CoefElasticNetCV(X, Y, k=3, n_core=4):
         y_train, y_test = Y[train_index], Y[test_index]
 
         # Cross-validation with Elastic Net
-        elasticcv = ElasticNetCV(alphas=alphas, cv=5, max_iter=1000, normalize=True)
+        elasticcv = ElasticNetCV(alphas=alphas, cv=5, max_iter=1000)
         elasticcv.fit(X_train, y_train)
-        elastic = ElasticNet(alpha=elasticcv.alpha_, max_iter=1e4, normalize=True).fit(X_train, y_train)
+        elastic = ElasticNet(alpha=elasticcv.alpha_, max_iter=1e4).fit(X_train, y_train)
 
         dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(elastic.coef_, index=X.columns).fillna(0)], axis=1)
 
@@ -458,9 +458,9 @@ def CoefRidgeCV(X, Y, k=3):
         y_train, y_test = Y[train_index], Y[test_index]
 
         # Cross-validation with Ridge
-        ridgecv = RidgeCV(alphas=alphas, cv=5, normalize=True)
+        ridgecv = RidgeCV(alphas=alphas, cv=5)
         ridgecv.fit(X_train, y_train)
-        ridge = Ridge(alpha=ridgecv.alpha_, max_iter=1e4, normalize=True).fit(X_train, y_train)
+        ridge = Ridge(alpha=ridgecv.alpha_, max_iter=1e4).fit(X_train, y_train)
 
         dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(ridge.coef_, index=X.columns).fillna(0)], axis=1)
 
@@ -487,7 +487,7 @@ def CoefRidge(x, y):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
 
     # Ridge regression with a specific alpha
-    ridge6 = Ridge(alpha=0.01, normalize=True)
+    ridge6 = Ridge(alpha=0.01)
     ridge6.fit(X_train, y_train)
 
     # Get coefficients as a Series

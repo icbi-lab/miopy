@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 # Define your package name and other metadata
 package_name = 'miopy'
-version = '1.3.5'
+version = '1.3.6'
 author = 'Pablo Monfort Lanzas'
 author_email = 'pablo.monfort@i-med.ac.at'
 description = 'MIOPY: Python tool to study miRNA-mRNA relationships.'
