@@ -116,14 +116,14 @@ def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None,
     """
 
     # Initialize parallel processing with the specified number of cores
-    pandarallel.initialize(verbose=1, nb_workers=n_core)
+    pandarallel.initialize(verbose=1, nb_workers=int(n_core))
 
     # Extract the list of microRNA and gene names from the expression dataframe
     lMir, lGene = header_list(exprDF=exprDf)
 
     # Load a confident dataframe and count "1" occurrences in the expression matrix
     dfConf = get_confident_df(load_matrix_counts().apply(lambda col: col.str.count("1")))
-
+    print("[+] microRNA/Gene confidence target calculated", flush=True)
     # Intersect gene and microRNA lists with the confident dataframe indices and columns
     lGene = intersection(lGene, dfConf.index.tolist())
     lMir = intersection(lMir, dfConf.columns.tolist())
@@ -141,7 +141,7 @@ def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None,
                                                         exprDf[lGene].apply(lambda expr:
                                                                            calculate_gene_set_score(expr, conf),
                                                                            axis=1), axis=0)
-
+    print("[+] microRNA/Geneset score calculated", flush=True)
     # Remove columns with NaN values from the GeneSetScore dataframe
     dfSetScore = dfSetScore.apply(lambda col: col.dropna())
 
@@ -153,8 +153,8 @@ def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None,
     cor = cor.apply(lambda col: col.dropna())
 
     # Create dataframes for correlation and p-values
-    dfPval = pd.DataFrame(cor.loc[:, 1])
-    dfCor = pd.DataFrame(cor.loc[:, 0])
+    dfPval = pd.DataFrame(cor.iloc[:, 1])
+    dfCor = pd.DataFrame(cor.iloc[:, 0])
 
     # Rename the columns with the GeneSetName
     dfPval.columns = [GeneSetName]
@@ -328,7 +328,7 @@ def CoefLassoCV(X, Y, k=3, n_core=4):
         y_train, y_test = Y[train_index], Y[test_index]
 
         # Cross-validation with Lasso
-        lassocv = LassoCV(cv=5, max_iter=1000)
+        lassocv = LassoCV(cv=5)
         lassocv.fit(X_train, y_train)
         lasso = Lasso(max_iter=1e4, alpha=lassocv.alpha_).fit(X_train, y_train)
 
@@ -354,7 +354,7 @@ def CoefLasso(x, y):
     alphas = [0.001, 0.02, 0.01, 0.1, 0.5, 1, 5]
 
     # Lasso regression with a specific alpha
-    lasso = Lasso(alpha=1, max_iter=1e4).fit(x, y)
+    lasso = Lasso(alpha=1).fit(x, y)
 
     # Get coefficients as a Series
     coef = pd.Series(lasso.coef_, index=x.columns)
@@ -422,9 +422,9 @@ def CoefElasticNetCV(X, Y, k=3, n_core=4):
         y_train, y_test = Y[train_index], Y[test_index]
 
         # Cross-validation with Elastic Net
-        elasticcv = ElasticNetCV(alphas=alphas, cv=5, max_iter=1000)
+        elasticcv = ElasticNetCV(alphas=alphas, cv=5)
         elasticcv.fit(X_train, y_train)
-        elastic = ElasticNet(alpha=elasticcv.alpha_, max_iter=1e4).fit(X_train, y_train)
+        elastic = ElasticNet(alpha=elasticcv.alpha_).fit(X_train, y_train)
 
         dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(elastic.coef_, index=X.columns).fillna(0)], axis=1)
 
@@ -460,7 +460,7 @@ def CoefRidgeCV(X, Y, k=3):
         # Cross-validation with Ridge
         ridgecv = RidgeCV(alphas=alphas, cv=5)
         ridgecv.fit(X_train, y_train)
-        ridge = Ridge(alpha=ridgecv.alpha_, max_iter=1e4).fit(X_train, y_train)
+        ridge = Ridge(alpha=ridgecv.alpha_).fit(X_train, y_train)
 
         dfTopCoefTemp = pd.concat([dfTopCoefTemp, pd.Series(ridge.coef_, index=X.columns).fillna(0)], axis=1)
 
