@@ -153,9 +153,8 @@ def gene_set_correlation(exprDf, lGeneSet, GeneSetName="GeneSet", lMirUser=None,
     cor = cor.apply(lambda col: col.dropna())
 
     # Create dataframes for correlation and p-values
-    # Create dataframes for correlation and p-values
-    dfPval = pd.DataFrame(cor.iloc[0, :])
-    dfCor = pd.DataFrame(cor.iloc[1, :])
+    dfPval = pd.DataFrame(cor.iloc[:, 1])
+    dfCor = pd.DataFrame(cor.iloc[:, 0])
 
     # Rename the columns with the GeneSetName
     dfPval.columns = [GeneSetName]
